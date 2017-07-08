@@ -7,7 +7,7 @@ set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++11 -static-libgcc -static-libstd
 
 set(SOURCE_FILES main.cpp)
 
-set(dir ${CMAKE_CURRENT_SOURCE_DIR})
+set(dir "${CMAKE_CURRENT_SOURCE_DIR}/out")
 set(CMAKE_ARCHIVE_OUTPUT_DIRECTORY "${dir}/lib")
 set(CMAKE_LIBRARY_OUTPUT_DIRECTORY "${dir}/lib")
 set(CMAKE_RUNTIME_OUTPUT_DIRECTORY "${dir}/bin")

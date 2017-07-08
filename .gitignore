@@ -1,6 +1,5 @@
 *.iml
 .idea/
 
-lib/
-bin/
+out/
 cmake-*/
