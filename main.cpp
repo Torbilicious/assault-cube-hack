@@ -1,16 +1,19 @@
 #include <iostream>
 #include <Windows.h>
-#include <string>
 #include <ctime>
 #include <vector>
 
 using namespace std;
 
-DWORD FindAdress(HANDLE procHandle, DWORD Offsets[], DWORD BaseAddress);
+DWORD FindAdress(HANDLE procHandle, vector<DWORD> offsets, DWORD baseAddress);
 
 void WriteToMemory(HANDLE procHandle);
 
 string string_format(const string fmt, ...);
+
+string getString(bool in);
+
+void printStatus();
 
 
 string windowName = "AssaultCube";
@@ -22,21 +25,17 @@ bool updateOnNextCycle = true;
 
 struct HackableValue {
     bool status;
+    int key;
     vector<BYTE> value;
     DWORD baseAddress;
     vector<DWORD> offsets;
-
-    string toString() {
-        return string_format("status: %s\nvalue: %s\nbaseAddress: %s\noffsets: %s\n",
-                             (status ? "true" : "false"),
-                             value,
-                             baseAddress,
-                             offsets);
-    }
 };
+
+vector<HackableValue> hacks;
 
 HackableValue ammo = {
         false,
+        VK_F1,
         {0xA3, 0x1C, 0x0, 0x0},
         0x004DF73C,
         {0x378, 0x14, 0x0}
@@ -44,6 +43,7 @@ HackableValue ammo = {
 
 HackableValue health = {
         false,
+        VK_F2,
         {0x39, 0x5, 0x0, 0x0},
         0x004DF73C,
         {0xF4}
@@ -51,38 +51,106 @@ HackableValue health = {
 
 
 int main() {
-    cout << "Hello, World!" << endl;
-    cout << "ammo:" << endl << ammo.toString() << endl;
-    cout << "health:" << endl << health.toString() << endl;
+
+    hacks.push_back(ammo);
+    hacks.push_back(health);
 
     HWND gameWindow = NULL;
-    int timeSinceLAstUpdate = clock();
+    int timeSinceLastUpdate = clock();
     int gameAvailableTimer = clock();
     int pressTimer = clock();
 
     DWORD procId = NULL;
+    HANDLE procHandle = NULL;
+
+    while (!GetAsyncKeyState(VK_INSERT)) {
+        if (clock() - gameAvailableTimer > 100) {
+            gameAvailableTimer = clock();
+            gameAvailable = false;
+
+            gameWindow = FindWindowA(NULL, lWindowName);
+            if (gameWindow) {
+                GetWindowThreadProcessId(gameWindow, &procId);
+                if (procId != 0) {
+                    procHandle = OpenProcess(PROCESS_ALL_ACCESS, false, procId);
+                    if (procHandle == INVALID_HANDLE_VALUE || procHandle == NULL) {
+                        gameStatus = "Failed to open Process for valid handle";
+                    } else {
+                        gameStatus = windowName + " is ready to be hacked";
+                        gameAvailable = true;
+                    }
+                } else {
+                    gameStatus = "Failed to get process Id";
+                }
+            } else {
+                gameStatus = windowName + ": NOT FOUND";
+            }
+
+            if (updateOnNextCycle || clock() - timeSinceLastUpdate > 5000) {
+                system("cls");
+                printStatus();
+                updateOnNextCycle = false;
+                timeSinceLastUpdate = clock();
+            }
+
+            if (gameAvailable) {
+                WriteToMemory(procHandle);
+            }
+        }
+
+        if (clock() - pressTimer > 400) {
+            if (gameAvailable) {
+                for (HackableValue &hack : hacks) {
+                    if (GetAsyncKeyState(hack.key)) {
+                        pressTimer = clock();
+                        hack.status = !hack.status;
+                        updateOnNextCycle = true;
+                    }
+                }
+            }
+        }
+    }
 
     return 0;
 }
 
+DWORD FindAdress(HANDLE procHandle, vector<DWORD> offsets, DWORD baseAddress) {
+    DWORD pointer = baseAddress;
+    DWORD temp = 0;
+    DWORD pointerAddress = 0;
 
-string string_format(const std::string fmt, ...) {
-    int size = ((int) fmt.size()) * 2 + 50;   // Use a rubric appropriate for your code
-    std::string str;
-    va_list ap;
-    while (1) {     // Maximum two passes on a POSIX system...
-        str.resize(size);
-        va_start(ap, fmt);
-        int n = vsnprintf((char *) str.data(), size, fmt.c_str(), ap);
-        va_end(ap);
-        if (n > -1 && n < size) {  // Everything worked
-            str.resize(n);
-            return str;
+    for (int i = 0; i < offsets.size(); i++) {
+        if (i == 0) {
+            ReadProcessMemory(procHandle, (LPCVOID) pointer, &temp, sizeof(temp), NULL);
         }
-        if (n > -1)  // Needed size returned
-            size = n + 1;   // For null char
-        else
-            size *= 2;      // Guess at a larger size (OS specific)
+
+        pointerAddress = temp + offsets[i];
+        ReadProcessMemory(procHandle, (LPCVOID) pointerAddress, &temp, sizeof(temp), NULL);
     }
-    return str;
+
+    return pointerAddress;
+}
+
+
+void WriteToMemory(HANDLE procHandle) {
+    DWORD addressToWrite;
+
+    for (HackableValue &hack : hacks) {
+        addressToWrite = FindAdress(procHandle, hack.offsets, hack.baseAddress);
+        WriteProcessMemory(procHandle, (BYTE *) addressToWrite, &hack.value, sizeof(hack.value), NULL);
+    }
+}
+
+void printStatus() {
+    cout << "------------------------------------------------------------" << endl;
+    cout << "                 AssaultCube memory hacker                  " << endl;
+    cout << "------------------------------------------------------------" << endl << endl;
+    cout << "Game status: " << gameStatus << endl << endl;
+    cout << "[F1] Unlimited ammo   -> " << getString(ammo.status) << endl << endl;
+    cout << "[F2] Unlimited health -> " << getString(health.status) << endl << endl;
+    cout << "[INSERT] Exit" << endl << endl;
+}
+
+string getString(bool in) {
+    return in ? "ON" : "OFF";
 }
