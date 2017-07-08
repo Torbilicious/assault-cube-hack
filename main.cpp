@@ -9,12 +9,9 @@ DWORD FindAdress(HANDLE procHandle, vector<DWORD> offsets, DWORD baseAddress);
 
 void WriteToMemory(HANDLE procHandle);
 
-string string_format(const string fmt, ...);
-
 string getString(bool in);
 
 void printStatus();
-
 
 string windowName = "AssaultCube";
 LPCSTR lWindowName = "AssaultCube";
@@ -24,8 +21,9 @@ bool gameAvailable = false;
 bool updateOnNextCycle = true;
 
 struct HackableValue {
+    string name;
     bool status;
-    int key;
+    pair<int, string> key;
     vector<BYTE> value;
     DWORD baseAddress;
     vector<DWORD> offsets;
@@ -34,16 +32,18 @@ struct HackableValue {
 vector<HackableValue> hacks;
 
 HackableValue ammo = {
+        "Unlimited Ammo",
         false,
-        VK_F1,
+        {VK_F1, "F1"},
         {0xA3, 0x1C, 0x0, 0x0},
         0x004DF73C,
         {0x378, 0x14, 0x0}
 };
 
 HackableValue health = {
+        "Unlimited Health",
         false,
-        VK_F2,
+        {VK_F2, "F2"},
         {0x39, 0x5, 0x0, 0x0},
         0x004DF73C,
         {0xF4}
@@ -101,7 +101,7 @@ int main() {
         if (clock() - pressTimer > 400) {
             if (gameAvailable) {
                 for (HackableValue &hack : hacks) {
-                    if (GetAsyncKeyState(hack.key)) {
+                    if (GetAsyncKeyState(hack.key.first)) {
                         pressTimer = clock();
                         hack.status = !hack.status;
                         updateOnNextCycle = true;
@@ -146,8 +146,11 @@ void printStatus() {
     cout << "                 AssaultCube memory hacker                  " << endl;
     cout << "------------------------------------------------------------" << endl << endl;
     cout << "Game status: " << gameStatus << endl << endl;
-    cout << "[F1] Unlimited ammo   -> " << getString(ammo.status) << endl << endl;
-    cout << "[F2] Unlimited health -> " << getString(health.status) << endl << endl;
+
+    for (HackableValue &hack : hacks) {
+        cout << "[" << hack.key.second << "] " << hack.name << " -> " << getString(hack.status) << endl << endl;
+    }
+
     cout << "[INSERT] Exit" << endl << endl;
 }
 
